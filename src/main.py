@@ -4,11 +4,12 @@ import ControlFlowGraph # graphs
 
 source = """
 
-def agu(dad, kawda):
+def agu(dad : False, kawda : str = 'dDsd'):
     print(123)
 
-gg = agu
-gg()
+ds = "dwa"
+gf = "jj"
+gg = agu(ds, gf)
 """
 
 def main():

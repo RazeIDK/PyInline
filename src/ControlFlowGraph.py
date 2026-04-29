@@ -23,31 +23,55 @@ class Map:
         """
         self.memory = {}
 
-    def parse_function_args(self, tokens):
+    def parse_function_args(self, tokens, is_call=False):
         count_tokens = len(tokens)
         args = []
-        open_flag = False
-        opened = 0
-
-        for i in range(count_tokens - 1):
+        current_arg = ""
+        paren_depth = 0
+        bracket_depth = 0
+        token_end = None
+        in_string = False
+        
+        i = 0
+        while i < count_tokens:
             token = tokens[i]
             token_type = token["name"]
             token_string = token["string"]
             token_end = token["end"]
-
-            if token_type == "OP":
-                if token_string == "(":
-                    opened += 1
-                elif token_string == ")":
-                    opened -= 1
-                
-            if opened == 1:
-                open_flag = True
-                if token_type == "NAME":
-                    args.append(token_string)
-            elif opened == 2 and open_flag:
+            
+            if token_string == "(" and paren_depth == 0:
+                paren_depth = 1
+                i += 1
+                continue
+            
+            if paren_depth == 0:
+                i += 1
+                continue
+            
+            if token_string == ")" and paren_depth == 1:
+                if current_arg.strip():
+                    args.append(self._parse_single_arg(current_arg.strip(), is_call))
                 break
-
+            
+            if token_type == "OP":
+                if token_string in "([{":
+                    bracket_depth += 1
+                    current_arg += token_string
+                elif token_string in ")]}":
+                    bracket_depth -= 1
+                    current_arg += token_string
+                elif token_string == "," and bracket_depth == 0 and not in_string:
+                    args.append(self._parse_single_arg(current_arg.strip(), is_call))
+                    current_arg = ""
+                else:
+                    current_arg += token_string
+            elif token_type in ["NAME", "NUMBER", "STRING"]:
+                current_arg += token_string
+            elif token_type not in ["INDENT", "DEDENT", "NEWLINE", "NL"]:
+                current_arg += token_string
+            
+            i += 1
+        
         return (args, token_end)
 
     def build_blocks(self):
@@ -150,19 +174,28 @@ class Map:
                 
                 # detect create function
                 if last_token_string == self.token_strings["function"]:
-                    args = self.parse_function_args(self.tokens[i:count_tokens - 1])
-                    index = (last_token_start, args[1])
-                    
-                    if not self.memory.get(index, False):
-                        self.memory[index] = {}
-                    if not self.memory.get(index, False).get("functions", False):
-                        self.memory[index]["functions"] = {}
-                    self.memory[index]["functions"][token_string] = {
-                        "args" : args[0]
-                    }
+                    paren_pos = -1
+                    for j in range(i, count_tokens):
+                        if self.tokens[j]["name"] == "OP" and self.tokens[j]["string"] == "(":
+                            paren_pos = j
+                            break
+                        
+                    if paren_pos != -1:
+                        args = self.parse_function_args(self.tokens[paren_pos:count_tokens - 1])
+                        index = (last_token_start, args[1])
+
+                        if not self.memory.get(index, False):
+                            self.memory[index] = {}
+                        if not self.memory.get(index, False).get("functions", False):
+                            self.memory[index]["functions"] = {}
+                        self.memory[index]["functions"][token_string] = {
+                            "args": args[0]
+                        }
 
             # detect other actions
             if token_type == "OP":
+                if token_string == "(":
+                    print()
                 if token_string == "=":
                     if next_token and last_token:
                         if next_token_type == "NAME" and last_token_type == "NAME":
@@ -176,14 +209,23 @@ class Map:
 
                             # call function
                             if call_flag:
-                                if not self.memory.get(index, False):
-                                    self.memory[index] = {}
-                                if not self.memory[index].get("calls", False):
-                                    self.memory[index]["calls"] = {}
-                                self.memory[index]["calls"][last_token_string] = {
-                                    "function": next_token_string,
-                                    "type": "call"
-                                }
+                                paren_pos = -1
+                                for j in range(i + 2, count_tokens):
+                                    if self.tokens[j]["name"] == "OP" and self.tokens[j]["string"] == "(":
+                                        paren_pos = j
+                                        break
+                                    
+                                if paren_pos != -1:
+                                    args = self.parse_function_args(self.tokens[paren_pos:count_tokens - 1], True)
+
+                                    if not self.memory.get(index, False):
+                                        self.memory[index] = {}
+                                    if not self.memory[index].get("calls", False):
+                                        self.memory[index]["calls"] = {}
+                                    self.memory[index]["calls"][last_token_string] = {
+                                        "function": next_token_string,
+                                        "args": args[0]
+                                    }
                             else:
                                 # clone function
                                 if not self.memory.get(index, False):
@@ -191,12 +233,199 @@ class Map:
                                 if not self.memory[index].get("assignments", False):
                                     self.memory[index]["assignments"] = {}
                                 self.memory[index]["assignments"][last_token_string] = {
-                                    "value": next_token_string,
-                                    "type": "copy"
+                                    "value" : next_token_string,
+                                    "type" : "copy"
                                 }
+
         print("blocks:")
         print(self.build_blocks())
         print(self.build_flow_graph())
+
+    def _parse_single_arg(self, arg_str, is_call=False):
+        arg_str = arg_str.strip()
+
+        result = {
+            "name" : arg_str,
+            "type": None,
+            "value": None
+            }
+
+        if is_call:
+            parsed_value = self._parse_value(arg_str)
+            arg_type = "literal"
+            actual_type = type(parsed_value).__name__
+            if isinstance(parsed_value, str) and not self._is_literal(arg_str):
+                arg_type = "variable"
+
+            result = {
+                "value" : parsed_value,
+                "type" : arg_type,
+                "actual_type" : actual_type,
+                "raw" : arg_str
+            }
+            return result
+
+        if ":" in arg_str:
+            name_part, rest = arg_str.split(":", 1)
+            result["name"] = name_part.strip()
+
+            if "=" in rest:
+                type_part, value_part = rest.split("=", 1)
+                if type_part.strip():
+                    result["type"] = self._parse_value(type_part.strip())
+                if value_part.strip():
+                    result["value"] = self._parse_value(value_part.strip())
+            else:
+                if rest.strip():
+                    result["type"] = self._parse_value(rest.strip())
+
+        elif "=" in arg_str:
+            name_part, value_part = arg_str.split("=", 1)
+            result["name"] = name_part.strip()
+            if value_part.strip():
+                result["value"] = self._parse_value(value_part.strip())
+
+        return result
+
+    def _is_literal(self, arg_str):
+        arg_str = arg_str.strip()
+
+        if arg_str.isdigit():
+            return True
+        try:
+            float(arg_str)
+            return True
+        except:
+            pass
+        
+        if arg_str.lower() in ['true', 'false']:
+            return True
+        if arg_str.lower() == 'none':
+            return True
+        if (arg_str.startswith('"') and arg_str.endswith('"')) or (arg_str.startswith("'") and arg_str.endswith("'")):
+            return True
+
+        if arg_str.startswith(('[', '{', '(')) and arg_str.endswith((']', '}', ')')):
+            return True
+        return False
+    
+    def _parse_value(self, value_str):
+        value_str = value_str.strip()
+
+        if ":" in value_str and not value_str.startswith('"'):
+            value_str = value_str.split(":")[0].strip()
+
+        if not value_str:
+            return None
+
+        if value_str.startswith('{') and value_str.endswith('}'):
+            return self._parse_dict(value_str)
+        if value_str.startswith('[') and value_str.endswith(']'):
+            return self._parse_list(value_str)
+        if value_str.startswith('(') and value_str.endswith(')'):
+            return self._parse_tuple(value_str)
+
+        if value_str.isdigit():
+            return int(value_str)
+        try:
+            if '.' in value_str:
+                return float(value_str)
+        except:
+            pass
+        
+        if value_str.lower() == 'true':
+            return True
+        if value_str.lower() == 'false':
+            return False
+
+        if value_str.lower() == 'none':
+            return None
+
+        if (value_str.startswith('"') and value_str.endswith('"')) or (value_str.startswith("'") and value_str.endswith("'")):
+            return value_str[1:-1]
+        return value_str
+
+    def _parse_list(self, list_str):
+        content = list_str[1:-1].strip()
+        if not content:
+            return []
+
+        items = []
+        current = ""
+        bracket_depth = 0
+        quote_char = None
+
+        for char in content:
+            if char in "\"'":
+                if quote_char is None:
+                    quote_char = char
+                elif quote_char == char:
+                    quote_char = None
+
+            if char == ',' and bracket_depth == 0 and quote_char is None:
+                items.append(self._parse_value(current.strip()))
+                current = ""
+            else:
+                current += char
+                if char in "([{":
+                    bracket_depth += 1
+                elif char in ")]}":
+                    bracket_depth -= 1
+
+        if current.strip():
+            items.append(self._parse_value(current.strip()))
+
+        return items
+
+    def _parse_dict(self, dict_str):
+        content = dict_str[1:-1].strip()
+        if not content:
+            return {}
+
+        result = {}
+        current_key = None
+        current_value = ""
+        bracket_depth = 0
+        quote_char = None
+        in_key = True
+        after_colon = False
+
+        i = 0
+        while i < len(content):
+            char = content[i]
+
+            if char in "\"'":
+                if quote_char is None:
+                    quote_char = char
+                elif quote_char == char:
+                    quote_char = None
+
+            if char in "([{" and quote_char is None:
+                bracket_depth += 1
+            elif char in ")]}" and quote_char is None:
+                bracket_depth -= 1
+
+            if char == ':' and bracket_depth == 0 and quote_char is None and not after_colon:
+                current_key = current_value.strip()
+                current_value = ""
+                after_colon = True
+            elif char == ',' and bracket_depth == 0 and quote_char is None and after_colon:
+                result[self._parse_value(current_key)] = self._parse_value(current_value.strip())
+                current_key = None
+                current_value = ""
+                after_colon = False
+            else:
+                current_value += char
+
+            i += 1
+
+        if after_colon and current_key is not None:
+            result[self._parse_value(current_key)] = self._parse_value(current_value.strip())
+
+        return result
+
+    def _parse_tuple(self, tuple_str):
+        return tuple(self._parse_list(tuple_str))
 
     def _get_debug(self):
         print("indents map")
