@@ -1,3 +1,5 @@
+import json
+
 class Map:
     def __init__(self, tokens : dict):
         self.tokens = tokens
@@ -9,12 +11,14 @@ class Map:
             "class" : "class"
         }
 
-        self.memory = {
-            "index" : {
-                "functions" : {},
-                "classes" : {}
-            }
+
+        """"
+        index" : {
+            "functions" : {},
+            "classes" : {}
         }
+        """
+        self.memory = {}
 
         self.standart_create_function = {
             "action" : False,
@@ -43,10 +47,9 @@ class Map:
 
         return args
 
-
     def generate_map(self):
         count_tokens = len(self.tokens)
-        create_function = self.standart_create_function
+        create_function = self.standart_create_function.copy()
         indent = 0
 
         for i in range(count_tokens - 1):
@@ -82,9 +85,10 @@ class Map:
                     create_function["action"] = True
                     create_function["index"] = token_index
                 
-                elif create_function["action"]:
+                if create_function["action"]:
                     index = create_function["index"]
                     args = self.parse_function_args(self.tokens[i:count_tokens - 1])
+                    create_function = self.standart_create_function.copy()
                     
                     if not self.memory.get(index, False):
                         self.memory[index] = {}
@@ -93,6 +97,19 @@ class Map:
                     self.memory[index]["functions"][token_string] = {
                         "args" : args
                     }
+
+    def _get_debug(self):
+        print("indents map")
+        indents_map_str = {str(k): v for k, v in self.indents_map.items()}
+        print(json.dumps(indents_map_str, indent=2))
+
+        print("\nmap")
+        map_str = {str(k): v for k, v in self.map.items()}
+        print(json.dumps(map_str, indent=2))
+
+        print("\nmemory")
+        memory_str = {str(k): v for k, v in self.memory.items()}
+        print(json.dumps(memory_str, indent=2))
 
 
             

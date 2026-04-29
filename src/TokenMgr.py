@@ -5,7 +5,7 @@ import token
 class Manager:
     def __init__(self, source_code : str):
         self.source_code = source_code
-        self.tokens = self.gen_tokens()
+        self.tokens = self.generate_tokens()
 
     def generate_tokens(self):
         buffer  = io.StringIO(self.source_code)

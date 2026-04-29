@@ -19,6 +19,7 @@ def main():
     print("map: ")
     cfg = ControlFlowGraph.Map(mgr._get_tokens())
     cfg.generate_map()
+    cfg._get_debug()
 
 
 
