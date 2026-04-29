@@ -91,10 +91,9 @@ class Map:
             # detect dedent and indent
             if token_type == "INDENT":
                 indent += 1
-                self.indents_map[token_start[0]] = indent
             elif token_type == "DEDENT":
                 indent -= 1
-                self.indents_map[token_start[0]] = indent
+            self.indents_map[token_start[0]] = indent
 
             # detect creates, calls and other
             if token_type == "NAME":
@@ -112,7 +111,7 @@ class Map:
                         "args" : args[0]
                     }
 
-            # detect clone function
+            # detect other actions
             if token_type == "OP":
                 if token_string == "=":
                     if next_token and last_token:
@@ -125,6 +124,7 @@ class Map:
                                 if after_next["name"] == "OP" and after_next["string"] == "(":
                                     call_flag = True
 
+                            # call function
                             if call_flag:
                                 if not self.memory.get(index, False):
                                     self.memory[index] = {}
@@ -135,6 +135,7 @@ class Map:
                                     "type": "call"
                                 }
                             else:
+                                # clone function
                                 if not self.memory.get(index, False):
                                     self.memory[index] = {}
                                 if not self.memory[index].get("assignments", False):
