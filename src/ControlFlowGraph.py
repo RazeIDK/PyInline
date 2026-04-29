@@ -50,6 +50,56 @@ class Map:
 
         return (args, token_end)
 
+    def build_blocks(self):
+        blocks = {}
+        current_block = []
+        last_indent = 0
+
+        for i, token in enumerate(self.tokens):
+            line_num = token["start"][0]
+            current_indent = self.indents_map.get(line_num, 0)
+
+            if current_indent > last_indent:
+                blocks[line_num] = {
+                    "type": "block_start",
+                    "indent": current_indent,
+                    "parent": last_indent
+                }
+            elif current_indent < last_indent:
+                blocks[line_num] = {
+                    "type": "block_end",
+                    "indent": current_indent
+                }
+
+            last_indent = current_indent
+
+        return blocks
+
+    def build_flow_graph(self):
+        graph = {}
+        prev_line = None
+        prev_indent = 0
+
+        for line_num, indent in sorted(self.indents_map.items()):
+            if prev_line is None:
+                prev_line = line_num
+                prev_indent = indent
+                continue
+
+            edge = (prev_line, line_num)
+
+            if indent > prev_indent:
+                graph[edge] = "start"
+            elif indent < prev_indent:
+                graph[edge] = "end"
+            else:
+                graph[edge] = "line"
+
+            prev_line = line_num
+            prev_indent = indent
+
+        return graph
+
     def generate_map(self):
         count_tokens = len(self.tokens)
         indent = 0
@@ -144,6 +194,9 @@ class Map:
                                     "value": next_token_string,
                                     "type": "copy"
                                 }
+        print("blocks:")
+        print(self.build_blocks())
+        print(self.build_flow_graph())
 
     def _get_debug(self):
         print("indents map")
