@@ -7,7 +7,8 @@ source = """
 def agu(dad, kawda):
     print(123)
 
-agu()
+gg = agu
+gg()
 """
 
 def main():
