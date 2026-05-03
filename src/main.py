@@ -7,9 +7,15 @@ source = """
 def agu(dad : False, kawda : str = 'dDsd'):
     print(123)
 
-ds = "dwa"
-gf = "jj"
-gg = agu(ds, gf)
+gg = agu
+hh = gg
+ll = hh
+hh()
+
+def aa(dg):
+    print(dg)
+
+aa("ggg")
 """
 
 def main():

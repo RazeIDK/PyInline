@@ -169,7 +169,7 @@ class Map:
                 indent -= 1
             self.indents_map[token_start[0]] = indent
 
-            # detect creates, calls and other
+            """# detect creates, calls and other
             if token_type == "NAME":
                 
                 # detect create function
@@ -190,12 +190,51 @@ class Map:
                             self.memory[index]["functions"] = {}
                         self.memory[index]["functions"][token_string] = {
                             "args": args[0]
+                        }"""
+
+            # detect call and create function
+            if next_token_type == "OP":
+                if next_token_string == "(":
+                    if last_token_string == self.token_strings["function"]:
+                        paren_pos = -1
+                        for j in range(i, count_tokens):
+                            if self.tokens[j]["name"] == "OP" and self.tokens[j]["string"] == "(":
+                                paren_pos = j
+                                break
+                            
+                        if paren_pos != -1:
+                            args = self.parse_function_args(self.tokens[paren_pos:count_tokens - 1])
+                            index = (last_token_start, args[1])
+
+                            if not self.memory.get(index, False):
+                                self.memory[index] = {}
+                            if not self.memory.get(index, False).get("functions", False):
+                                self.memory[index]["functions"] = {}
+                            self.memory[index]["functions"][token_string] = {
+                                "args": args[0]
+                            }
+                    else:
+                        func_name = token_string
+                        actual_func = self._resolve_variable_to_function(func_name)
+                        paren_pos = i
+
+                        args = self.parse_function_args(self.tokens[paren_pos:count_tokens - 1], True)
+                        index = (last_token_start, token_end)
+
+                        if not self.memory.get(index, False):
+                            self.memory[index] = {}
+                        if not self.memory[index].get("calls", False):
+                            self.memory[index]["calls"] = {}
+
+                        self.memory[index]["calls"][func_name] = {
+                            "function": actual_func if actual_func else func_name,
+                            "args": args[0],
+                            "is_variable_call": True,
+                            "resolved_from": func_name
                         }
 
             # detect other actions
             if token_type == "OP":
-                if token_string == "(":
-                    print()
                 if token_string == "=":
                     if next_token and last_token:
                         if next_token_type == "NAME" and last_token_type == "NAME":
@@ -286,6 +325,25 @@ class Map:
                 result["value"] = self._parse_value(value_part.strip())
 
         return result
+    
+    def _resolve_variable_to_function(self, var_name):
+        for pos, data in self.memory.items():
+            if "assignments" in data:
+                for var, assign in data["assignments"].items():
+                    if var == var_name:
+                        value = assign["value"]
+                        if self._is_function_name(value):
+                            return value
+                        else:
+                            return self._resolve_variable_to_function(value)
+        return var_name
+
+    def _is_function_name(self, name):
+        for pos, data in self.memory.items():
+            if "functions" in data:
+                if name in data["functions"]:
+                    return True
+        return False
 
     def _is_literal(self, arg_str):
         arg_str = arg_str.strip()
