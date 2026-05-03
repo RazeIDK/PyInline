@@ -180,7 +180,7 @@ class Map:
                                 break
                             
                         if paren_pos != -1:
-                            args = self.parse_function_args(self.tokens[paren_pos:count_tokens - 1])
+                            args = self.parse_function_args(self.tokens[paren_pos:count_tokens])
                             index = (last_token_start, args[1])
 
                             if not self.memory.get(index, False):
@@ -195,7 +195,7 @@ class Map:
                         actual_func = self._resolve_variable_to_function(func_name)
                         paren_pos = i
 
-                        args = self.parse_function_args(self.tokens[paren_pos:count_tokens - 1], True)
+                        args = self.parse_function_args(self.tokens[paren_pos:count_tokens], True)
                         index = (last_token_start, token_end)
 
                         if not self.memory.get(index, False):
@@ -232,7 +232,7 @@ class Map:
                                         break
                                     
                                 if paren_pos != -1:
-                                    args = self.parse_function_args(self.tokens[paren_pos:count_tokens - 1], True)
+                                    args = self.parse_function_args(self.tokens[paren_pos:count_tokens], True)
 
                                     if not self.memory.get(index, False):
                                         self.memory[index] = {}

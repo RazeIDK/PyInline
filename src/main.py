@@ -3,8 +3,8 @@ import TokenMgr # tokens
 import ControlFlowGraph # graphs
 
 source = """
-asd = 'gg'
-fff = 239e
+def aa(dd : bool = True):
+    print(dd)
 """
 
 def main():
