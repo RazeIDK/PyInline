@@ -169,29 +169,6 @@ class Map:
                 indent -= 1
             self.indents_map[token_start[0]] = indent
 
-            """# detect creates, calls and other
-            if token_type == "NAME":
-                
-                # detect create function
-                if last_token_string == self.token_strings["function"]:
-                    paren_pos = -1
-                    for j in range(i, count_tokens):
-                        if self.tokens[j]["name"] == "OP" and self.tokens[j]["string"] == "(":
-                            paren_pos = j
-                            break
-                        
-                    if paren_pos != -1:
-                        args = self.parse_function_args(self.tokens[paren_pos:count_tokens - 1])
-                        index = (last_token_start, args[1])
-
-                        if not self.memory.get(index, False):
-                            self.memory[index] = {}
-                        if not self.memory.get(index, False).get("functions", False):
-                            self.memory[index]["functions"] = {}
-                        self.memory[index]["functions"][token_string] = {
-                            "args": args[0]
-                        }"""
-
             # detect call and create function
             if next_token_type == "OP":
                 if next_token_string == "(":
@@ -275,6 +252,28 @@ class Map:
                                     "value" : next_token_string,
                                     "type" : "copy"
                                 }
+                        else:
+                            if last_token_type == "NAME":
+                                index = (last_token_start, next_token_end)
+
+                                if next_token_type == "STRING":
+                                    if not self.memory.get(index, False):
+                                        self.memory[index] = {}
+                                    if not self.memory[index].get("variables", False):
+                                        self.memory[index]["variables"] = {}
+                                    self.memory[index]["variables"][last_token_string] = {
+                                        "value" : next_token_string[1:-1],
+                                        "type" : "string"
+                                    }
+                                elif next_token_type == "NUMBER":
+                                    if not self.memory.get(index, False):
+                                        self.memory[index] = {}
+                                    if not self.memory[index].get("variables", False):
+                                        self.memory[index]["variables"] = {}
+                                    self.memory[index]["variables"][last_token_string] = {
+                                        "value" : next_token_string,
+                                        "type" : "number"
+                                    }
 
         print("blocks:")
         print(self.build_blocks())
