@@ -1,24 +1,86 @@
 import os
-import TokenMgr # tokens
-import ControlFlowGraph # graphs
+import ast
 
 source = """
-def aa(dd : bool = True):
-    print(dd)
+ff = True
+def aa(gg : bool):
+    if ff != False:
+        print(gg)
+aa(ff)
 """
 
+class VisitorInline(ast.NodeTransformer):
+    def __init__(self):
+        self.memory_functions = {}
+
+    def visit_FunctionDef(self, node):
+        self.memory_functions[node] = None
+        print(node)
+
+        return None
+    
+    def visit_Expr(self, node):
+        if isinstance(node.value, ast.Call):
+            function_name = node.value.func.id
+            value = None
+            
+            for i in range(len(self.memory_functions.keys())):
+                mem = list(self.memory_functions.keys())[i]
+
+                if function_name == mem.name:
+                    assigns = []
+                    for arg in mem.args.args:
+                        annotation = arg.annotation.id
+                        arg_var = arg.arg
+
+                        arg_call = node.value.args[i]
+
+                        assigns.append(
+                            ast.Assign(
+                                targets=[
+                                    ast.Name(id=arg_var, ctx=ast.Store())
+                                    ],
+                                value=arg_call, kind=None)
+                        )
+
+                        assigns.append(
+                            ast.If(
+                                test=ast.UnaryOp(
+                                    op=ast.Not(),
+                                    operand=ast.Call(
+                                        func=ast.Name(id='isinstance', ctx=ast.Load()),
+                                        args=[
+                                            ast.Name(id=arg_var, ctx=ast.Load()),
+                                            ast.Name(id=annotation, ctx=ast.Load())])),
+                                body=[
+                                    ast.Raise(
+                                        exc=ast.Call(
+                                            func=ast.Name(id='ValueError', ctx=ast.Load())
+                                        )
+                                    )
+                                ]
+                            )
+                        )
+                    
+                    mem.body = assigns + mem.body
+                    return mem.body
+                    break
+
+        return node
+
+
 def main():
-    mgr = TokenMgr.Manager(source)
+    tree = ast.parse(source)
+    print(ast.dump(tree, indent=4, include_attributes=False))
+    print("="*20 + "\n")
+    transformed = VisitorInline().visit(tree)
+    ast.fix_missing_locations(transformed)
 
-    print("tokens: ")
-    mgr.print_tokens()
+    print("\n" + "="*20)
+    print(ast.unparse(transformed))
 
-    print("map: ")
-    cfg = ControlFlowGraph.Map(mgr._get_tokens())
-    cfg.generate_map()
-    cfg._get_debug()
-
-
+    print("\n" + "="*20)
+    exec(ast.unparse(transformed))
 
 
 if __name__ == "__main__":
